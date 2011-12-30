@@ -187,20 +187,29 @@ class PEAR_Sniffs_Functions_FunctionCallSignatureSniff implements PHP_CodeSniffe
             if ($tokens[$i]['line'] !== $lastLine) {
                 $lastLine = $tokens[$i]['line'];
 
-                // We changed lines, so this should be a whitespace indent token.
+                // Ignore heredoc indentation.
                 if (in_array($tokens[$i]['code'], PHP_CodeSniffer_Tokens::$heredocTokens) === true) {
-                    // Ignore heredoc indentation.
                     continue;
                 }
 
+                // Ignore multi-line string indentation.
                 if (in_array($tokens[$i]['code'], PHP_CodeSniffer_Tokens::$stringTokens) === true) {
                     if ($tokens[$i]['code'] === $tokens[($i - 1)]['code']) {
-                        // Ignore multi-line string indentation.
                         continue;
                     }
                 }
 
-                if ($tokens[$i]['line'] === $tokens[$closeBracket]['line']) {
+                // We changed lines, so this should be a whitespace indent token, but first make
+                // sure it isn't a blank line because we don't need to check indent unless there
+                // is actually some code to indent.
+                $nextCode = $phpcsFile->findNext(T_WHITESPACE, ($i + 1), ($closeBracket + 1), true);
+                if ($tokens[$nextCode]['line'] !== $lastLine) {
+                    $error = 'Empty lines are not allowed in multi-line function calls';
+                    $phpcsFile->addError($error, $i, 'EmptyLine');
+                    continue;
+                }
+
+                if ($nextCode === $closeBracket) {
                     // Closing brace needs to be indented to the same level
                     // as the function call.
                     $expectedIndent = $functionIndent;
